@@ -38,6 +38,30 @@ var (
 )
 
 var (
+	chartStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color(amber)).
+			BorderStyle(lipgloss.NormalBorder()).
+			BorderForeground(lipgloss.Color(amber))
+
+	chartTextStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color(normal)).
+			Align(lipgloss.Right)
+
+	gaugeGapStyle = lipgloss.NewStyle().
+			BorderStyle(lipgloss.NormalBorder()).
+			BorderForeground(lipgloss.Color(amber)).
+			BorderBottom(true).
+			BorderRight(true).
+			MarginRight(1)
+
+	gaugeBarStyle = gaugeGapStyle.
+			BorderBottom(false).
+			BorderRight(false).
+			MarginRight(0)
+
+	gaugeTextStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color(normal))
+
 	baseStyle = lipgloss.NewStyle().
 			BorderForeground(lipgloss.Color("#FFBF00")).
 			Bold(true).

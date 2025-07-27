@@ -9,8 +9,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/NimbleMarkets/ntcharts/sparkline"
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/key"
+	"github.com/charmbracelet/bubbles/progress"
 	"github.com/charmbracelet/bubbles/table"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -30,6 +32,8 @@ type model struct {
 	cpuStats        cpu.TimesStat
 	cpuPrevStats    cpu.TimesStat
 	cpuTable        table.Model
+	cpuChart        sparkline.Model
+	cpuProgress     progress.Model
 	processes       []systeminfo.ProcessInfo
 	procTable       table.Model
 	memory          mem.VirtualMemoryStat
@@ -82,7 +86,7 @@ type tickMsg struct{}
 
 // Setting the ticker for 500 milliseconds intervals
 func tick() tea.Cmd {
-	return tea.Tick(500*time.Millisecond, func(t time.Time) tea.Msg {
+	return tea.Tick(200*time.Millisecond, func(t time.Time) tea.Msg {
 		return tickMsg{}
 	})
 }
@@ -113,6 +117,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			logger.Logger.Error("Couldn't get CPU times", slog.String("error", err.Error()))
 		}
 		m.cpuTotalPercent = cpuPercent
+
+		m.cpuChart.Push(cpuPercent)
+		m.cpuChart.Draw()
 
 		mem, err := systeminfo.GetMEMLoad()
 		if err != nil {
@@ -196,7 +203,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		m.diskTable.SetRows(diskRows)
 
-		return m, tick()
+		return m, tea.Batch(cmd, tick())
 
 	// Handle key pressing events
 	case tea.KeyMsg:

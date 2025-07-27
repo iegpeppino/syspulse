@@ -2,9 +2,12 @@ package main
 
 import (
 	"fmt"
+	"math"
 	"strings"
 
+	"github.com/NimbleMarkets/ntcharts/sparkline"
 	"github.com/charmbracelet/bubbles/help"
+	"github.com/charmbracelet/bubbles/progress"
 	"github.com/charmbracelet/bubbles/table"
 	"github.com/charmbracelet/lipgloss"
 )
@@ -13,10 +16,14 @@ import (
 
 // Model Initializer
 func modelInit() model {
+
+	cpuProgress := progress.New(progress.WithGradient("#008000", "#FF0000"), progress.WithoutPercentage())
+	cpuProgress.Width = 40
+
 	cpuColumns := []table.Column{
-		{Title: "Load", Width: 30},
-		{Title: "Value (%)", Width: 30},
-		{Title: "Delta", Width: 20},
+		{Title: "Load", Width: 15},
+		{Title: "Value (%)", Width: 15},
+		{Title: "Delta", Width: 10},
 	}
 
 	cpuTable := initTable(cpuColumns)
@@ -50,14 +57,16 @@ func modelInit() model {
 	diskTable := initTable(diskCols)
 
 	m := model{
-		tabs:      []string{"CPU", "MEMORY", "PROCESSES", "DISK"},
-		ActiveTab: 0,
-		keys:      keys,
-		help:      help.New(),
-		cpuTable:  cpuTable,
-		memTable:  memTable,
-		procTable: procTable,
-		diskTable: diskTable,
+		tabs:        []string{"CPU", "MEMORY", "PROCESSES", "DISK"},
+		ActiveTab:   0,
+		keys:        keys,
+		help:        help.New(),
+		cpuTable:    cpuTable,
+		cpuProgress: cpuProgress,
+		memTable:    memTable,
+		procTable:   procTable,
+		diskTable:   diskTable,
+		cpuChart:    sparkline.New(40, 10, sparkline.WithMaxValue(100.0)),
 	}
 
 	return m
@@ -128,14 +137,25 @@ func (m model) renderTab(activeTab int) string {
 	switch {
 	// CPU stats
 	case activeTab == 0:
-		return pageContentStyle.Render(lipgloss.JoinVertical(
-			lipgloss.Left,
-			gauge.Render(fmt.Sprintf(
-				"CPU: %.2f%%\n%s\n",
-				m.cpuTotalPercent,
-				loadGauge(m.cpuTotalPercent, 45))),
+		return pageContentStyle.Render(lipgloss.JoinHorizontal(
+			lipgloss.Top,
+			lipgloss.JoinVertical(
+				lipgloss.Left,
+				chartStyle.Render(m.cpuChart.View()),
+				m.cpuProgress.ViewAs(math.Min(m.cpuTotalPercent/100.0, 1.0)),
+			),
 			baseStyle.Render(m.cpuTable.View()),
-		))
+		),
+		)
+
+		// return pageContentStyle.Render(lipgloss.JoinVertical(
+		// 	lipgloss.Left,
+		// 	gauge.Render(fmt.Sprintf(
+		// 		"CPU: %.2f%%\n%s\n",
+		// 		m.cpuTotalPercent,
+		// 		loadGauge(m.cpuTotalPercent, 45))),
+		// 	baseStyle.Render(m.cpuTable.View()),
+		// ))
 		// return lipgloss.JoinVertical(
 		// 	lipgloss.Left,
 		// 	gauge.Render(fmt.Sprintf(
