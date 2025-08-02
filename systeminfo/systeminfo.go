@@ -34,33 +34,33 @@ func GetCPUPercent() (float64, error) {
 	return cpuPercentage[0], nil
 }
 
-// Return Cpu Loads
-func GetCPULoad() ([]cpu.TimesStat, error) {
+// Return Cpu times spent on different processes
+func GetCPUTimes() (*[]cpu.TimesStat, error) {
 
-	cpuLoad, err := cpu.Times(false)
+	cpuTimes, err := cpu.Times(false)
 	if err != nil {
-		return []cpu.TimesStat{}, err
+		return &[]cpu.TimesStat{}, err
 	}
 
-	currLoad := cpuLoad[0]
+	currTimes := cpuTimes[0]
 
-	// Calculate total CPU load
-	totalLoad := currLoad.Guest + currLoad.Idle + currLoad.Iowait + currLoad.Irq +
-		currLoad.Nice + currLoad.Softirq + currLoad.Steal + currLoad.System + currLoad.User
+	// Calculate combined CPU times
+	totalTime := currTimes.Guest + currTimes.Idle + currTimes.Iowait + currTimes.Irq +
+		currTimes.Nice + currTimes.Softirq + currTimes.Steal + currTimes.System + currTimes.User
 
-	// Convert loads to percentual values using totalLoad
-	currLoad.Guest = (currLoad.Guest / totalLoad) * 100
-	currLoad.Idle = (currLoad.Idle / totalLoad) * 100
-	currLoad.Iowait = (currLoad.Iowait / totalLoad) * 100
-	currLoad.Irq = (currLoad.Irq / totalLoad) * 100
-	currLoad.Nice = (currLoad.Nice / totalLoad) * 100
-	currLoad.Softirq = (currLoad.Softirq / totalLoad) * 100
-	currLoad.Steal = (currLoad.Steal / totalLoad) * 100
-	currLoad.System = (currLoad.System / totalLoad) * 100
-	currLoad.User = (currLoad.User / totalLoad) * 100
+	// Convert times to percentual values using totalTimes
+	currTimes.Guest = (currTimes.Guest / totalTime) * 100     // Guest operating systems
+	currTimes.Idle = (currTimes.Idle / totalTime) * 100       // Not actively executing tasks
+	currTimes.Iowait = (currTimes.Iowait / totalTime) * 100   // I/O ops
+	currTimes.Irq = (currTimes.Irq / totalTime) * 100         // Interrupt service
+	currTimes.Nice = (currTimes.Nice / totalTime) * 100       // Low schedule priority processes
+	currTimes.Softirq = (currTimes.Softirq / totalTime) * 100 // Software Interrupt Service
+	currTimes.Steal = (currTimes.Steal / totalTime) * 100     // Cpu stolen by virtual environments
+	currTimes.System = (currTimes.System / totalTime) * 100   // Executing OS's (kernel's) code
+	currTimes.User = (currTimes.User / totalTime) * 100       // Executing programs' instructions within user space
 
-	cpuLoad[0] = currLoad
-	return cpuLoad, nil
+	cpuTimes[0] = currTimes
+	return &cpuTimes, nil
 
 }
 
@@ -73,11 +73,11 @@ func GetMEMLoad() (*mem.VirtualMemoryStat, error) {
 	}
 
 	return &mem.VirtualMemoryStat{
-		Total:       v.Total,
-		Available:   v.Available,
-		Used:        v.Used,
-		UsedPercent: v.UsedPercent,
-		Free:        v.Free,
+		Total:       v.Total,       // Total RAM amount on this system
+		Available:   v.Available,   // RAM available to allocate
+		Used:        v.Used,        // RAM used by programs
+		UsedPercent: v.UsedPercent, // RAM used by programs in percentual value
+		Free:        v.Free,        // Kernel's notion of free memory
 		Buffers:     v.Buffers,
 		Cached:      v.Cached,
 	}, nil

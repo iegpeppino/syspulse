@@ -8,19 +8,21 @@ import (
 func TableStyle() table.Styles {
 	s := table.DefaultStyles()
 	s.Header = s.Header.
-		Margin(2, 0, 0, 0).
+		Margin(1, 0, 0, 0).
 		BorderStyle(lipgloss.NormalBorder()).
 		BorderForeground(lipgloss.Color("#FFBF00")).
 		BorderBottom(true).
 		AlignVertical(lipgloss.Center).
 		Bold(false)
 	s.Cell = s.Cell.
+		MarginLeft(2).
 		AlignHorizontal(lipgloss.Left).
 		Padding(1, 0, 0, 1)
 
 	s.Selected = s.Selected.
 		Foreground(lipgloss.Color("229")).
 		Bold(false)
+
 	return s
 }
 
@@ -38,6 +40,39 @@ var (
 )
 
 var (
+	bottomColStyle = lipgloss.NewStyle().
+			AlignHorizontal(lipgloss.Center).
+			Margin(1, 2, 0, 6)
+
+	chartStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color(amber)).
+			BorderStyle(lipgloss.NormalBorder()).
+			BorderForeground(lipgloss.Color(amber)).
+			BorderBottom(true)
+
+	chartTextStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color(normal)).
+			Align(lipgloss.Right).
+			Bold(true).
+			MarginLeft(2)
+
+	gaugeStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color(normal)).
+			MarginLeft(6)
+
+	listTextStyle = lipgloss.NewStyle().
+			Foreground(normal).
+			Margin(0, 0, 1, 2).
+			Bold(false)
+
+	listTitleStyle = lipgloss.NewStyle().
+			Margin(2, 5, 1, 2).
+			Padding(0, 1, 0, 1).
+			Foreground(lipgloss.Color(normal)).
+			BorderStyle(lipgloss.NormalBorder()).
+			BorderForeground(amber).
+			BorderBottom(true)
+
 	baseStyle = lipgloss.NewStyle().
 			BorderForeground(lipgloss.Color("#FFBF00")).
 			Bold(true).
@@ -96,21 +131,9 @@ var (
 			BorderForeground(amber).
 			BorderBottom(true)
 
+	termWidth, termHeight = getTermSize()
+
 	pageContentStyle = lipgloss.NewStyle().
-				Height(32)
+				MaxHeight(termHeight).
+				MaxWidth(termWidth)
 )
-
-//pageContentStyle.Render()
-
-func gaugeProgress(cpuPercent float64) lipgloss.Color {
-	switch {
-	case cpuPercent < 50:
-		return green
-	case cpuPercent < 75:
-		return yellow
-	case cpuPercent < 90:
-		return orange
-	default:
-		return red
-	}
-}

@@ -11,7 +11,7 @@ var Logger *slog.Logger
 func SysDataLogger() {
 
 	// Configure logger to write to file
-	logFile, err := os.OpenFile("../logs/errors/systemstats.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	logFile, err := os.OpenFile("./logs/errors/systemstats.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		slog.Error("Failed to open log file", "error", err)
 		// Return stderr of file loggin fails
