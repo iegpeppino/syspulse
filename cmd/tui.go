@@ -114,15 +114,17 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.cpuInfo = cpuInfo
 
-		// Get and update system stats
+		//Get and update system stats
 		cpuPercent, err := systeminfo.GetCPUPercent()
 		if err != nil {
 			logger.Logger.Error("Couldn't get CPU times", slog.String("error", err.Error()))
 		}
+
 		m.cpuTotalPercent = cpuPercent
+		// m.cpuTotalPercent = rand.Float64() * 100 // Only used for visual testing purposes
 
 		// Update and draw CPU usage chart
-		m.cpuChart.Push(cpuPercent)
+		m.cpuChart.Push(m.cpuTotalPercent)
 		m.cpuChart.Draw()
 
 		mem, err := systeminfo.GetMEMLoad()
