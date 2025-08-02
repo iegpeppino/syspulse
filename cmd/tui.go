@@ -5,7 +5,6 @@ import (
 	"github/iegpeppino/syspulse/logger"
 	"github/iegpeppino/syspulse/systeminfo"
 	"log/slog"
-	"os"
 	"strings"
 	"time"
 
@@ -16,7 +15,6 @@ import (
 	"github.com/charmbracelet/bubbles/table"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/charmbracelet/x/term"
 	"github.com/shirou/gopsutil/v4/cpu"
 	"github.com/shirou/gopsutil/v4/mem"
 )
@@ -29,6 +27,7 @@ type model struct {
 	keys            keyMap
 	help            help.Model
 	cpuTotalPercent float64
+	cpuInfo         cpu.InfoStat
 	cpuStats        cpu.TimesStat
 	cpuPrevStats    cpu.TimesStat
 	cpuTable        table.Model
@@ -38,6 +37,8 @@ type model struct {
 	procTable       table.Model
 	memory          mem.VirtualMemoryStat
 	memTable        table.Model
+	memChart        sparkline.Model
+	memProgress     progress.Model
 	disk            []systeminfo.DiskInfo
 	diskTable       table.Model
 	err             error
@@ -100,16 +101,18 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
-
-		// Setting width using terminal size
-		fd := uintptr(os.Stdout.Fd())
-		width, _, _ := term.GetSize(fd)
-		m.width = width
-		m.height = msg.Height
+		// Update model height and width
+		m.width, m.height = getTermSize()
 		m.help.Width = msg.Width
 
 	// In case of tick
 	case tickMsg:
+		// Get general cpu information
+		cpuInfo, err := systeminfo.GetCPUinfo()
+		if err != nil {
+			logger.Logger.Error("Couldn't get CPU Info", slog.String("error", err.Error()))
+		}
+		m.cpuInfo = cpuInfo
 
 		// Get and update system stats
 		cpuPercent, err := systeminfo.GetCPUPercent()
@@ -118,6 +121,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.cpuTotalPercent = cpuPercent
 
+		// Update and draw CPU usage chart
 		m.cpuChart.Push(cpuPercent)
 		m.cpuChart.Draw()
 
@@ -127,15 +131,20 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.memory = *mem
 
+		// Update and draw RAM usage chart
+		m.memChart.Push(m.memory.UsedPercent)
+		m.memChart.Draw()
+
 		// Compare previous cpuTimes with current
 		// and observe increment or decrement tendency
-		cpuTimes, _ := systeminfo.GetCPULoad()
-		if len(cpuTimes) > 0 {
+		cpuTimes, _ := systeminfo.GetCPUTimes()
+		if len(*cpuTimes) > 0 {
 			m.cpuPrevStats = m.cpuStats
-			m.cpuStats = cpuTimes[0]
+			prevTimes := (*cpuTimes)[0]
+			m.cpuStats = prevTimes
 		}
 
-		processes, err := systeminfo.GetProcessInfo(7)
+		processes, err := systeminfo.GetProcessInfo(9)
 		if err != nil {
 			logger.Logger.Error("Unable to read running processes", slog.String("error", err.Error()))
 		}
@@ -156,6 +165,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			{"Guest", fmt.Sprintf("%.2f%%", m.cpuStats.Guest), delta(m.cpuStats.Guest, m.cpuPrevStats.Guest)},
 			{"IRQ", fmt.Sprintf("%.2f%%", m.cpuStats.Irq), delta(m.cpuStats.Irq, m.cpuPrevStats.Irq)},
 			{"SoftIRQ", fmt.Sprintf("%.2f%%", m.cpuStats.Softirq), delta(m.cpuStats.Softirq, m.cpuPrevStats.Softirq)},
+			{"IOWait", fmt.Sprintf("%.2f%%", m.cpuStats.Iowait), delta(m.cpuStats.Iowait, m.cpuPrevStats.Iowait)},
 		}
 
 		m.cpuTable.SetRows(cpuRows)

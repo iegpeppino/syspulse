@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"math"
+	"os"
 	"strings"
 
 	"github.com/NimbleMarkets/ntcharts/sparkline"
@@ -10,27 +11,35 @@ import (
 	"github.com/charmbracelet/bubbles/progress"
 	"github.com/charmbracelet/bubbles/table"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/term"
 )
 
 // Helper functions and structs
 
 // Model Initializer
+// Creates templates for tables, charts and other models
+// to initialize the bubbletea model
 func modelInit() model {
 
+	termWidth, termHeight := getTermSize()
+
 	cpuProgress := progress.New(progress.WithGradient("#008000", "#FF0000"), progress.WithoutPercentage())
-	cpuProgress.Width = 40
+	cpuProgress.Width = termWidth / 2
+
+	memProgress := progress.New(progress.WithGradient("#008000", "#FF0000"), progress.WithoutPercentage())
+	memProgress.Width = termWidth / 2
 
 	cpuColumns := []table.Column{
-		{Title: "Load", Width: 15},
-		{Title: "Value (%)", Width: 15},
-		{Title: "Delta", Width: 10},
+		{Title: "CPU time", Width: termWidth / 10},
+		{Title: "Value (%)", Width: termWidth / 10},
+		{Title: "Delta", Width: termWidth / 12},
 	}
 
 	cpuTable := initTable(cpuColumns)
 
 	memCols := []table.Column{
-		{Title: "Type", Width: 40},
-		{Title: "Value", Width: 40},
+		{Title: "Type", Width: termWidth / 8},
+		{Title: "Value", Width: termWidth / 8},
 	}
 
 	memTable := initTable(memCols)
@@ -62,11 +71,15 @@ func modelInit() model {
 		keys:        keys,
 		help:        help.New(),
 		cpuTable:    cpuTable,
+		cpuChart:    sparkline.New(termWidth/2, 10, sparkline.WithMaxValue(100.0)),
 		cpuProgress: cpuProgress,
 		memTable:    memTable,
+		memChart:    sparkline.New(termWidth/2, 10, sparkline.WithMaxValue(100.0)),
+		memProgress: memProgress,
 		procTable:   procTable,
 		diskTable:   diskTable,
-		cpuChart:    sparkline.New(40, 10, sparkline.WithMaxValue(100.0)),
+		width:       termWidth,
+		height:      termHeight,
 	}
 
 	return m
@@ -84,6 +97,13 @@ func initTable(cols []table.Column) table.Model {
 	return t
 }
 
+// Returns the terminal width
+func getTermSize() (int, int) {
+	fd := uintptr(os.Stdout.Fd())
+	width, height, _ := term.GetSize(fd)
+	return width, height
+}
+
 // Compares previous and actual number and returns symbol
 // Used to express CPU load variation tendency
 func delta(now, prev float64) string {
@@ -97,115 +117,78 @@ func delta(now, prev float64) string {
 	}
 }
 
-// CPU and Memory load gauge bar constructor
-func loadGauge(loadPercent float64, width int) string {
-	// Calculate width for current load
-	full := int(loadPercent / 100 * float64(width))
-	empty := width - full
-
-	bar := strings.Builder{}
-	// Render left separator
-	bar.WriteString(
-		lipgloss.NewStyle().
-			Foreground(amber).
-			Render(" | "))
-	// Render load progress
-	for i := 0; i < full; i++ {
-		bar.WriteString(
-			lipgloss.NewStyle().
-				Foreground(gaugeProgress(loadPercent)). // Gets load based color
-				Render("█ "))
-	}
-	// Render the empty part of the gauge bar
-	for i := 0; i < empty; i++ {
-		bar.WriteString(
-			lipgloss.NewStyle().
-				Foreground(lipgloss.Color(gray)).
-				Render("░ "))
-	}
-	// Render right separator
-	bar.WriteString(
-		lipgloss.NewStyle().
-			Foreground(amber).
-			Render(" | "))
-	return bar.String()
-}
-
 // Returns the contents of a tab to render
 // depending on the activeTab variable
 func (m model) renderTab(activeTab int) string {
 	switch {
 	// CPU stats
 	case activeTab == 0:
-		return pageContentStyle.Render(lipgloss.JoinHorizontal(
-			lipgloss.Top,
+		return pageContentStyle.Render(
 			lipgloss.JoinVertical(
 				lipgloss.Left,
-				chartStyle.Render(m.cpuChart.View()),
-				m.cpuProgress.ViewAs(math.Min(m.cpuTotalPercent/100.0, 1.0)),
+				lipgloss.JoinHorizontal(
+					lipgloss.Left,
+					lipgloss.JoinVertical(
+						lipgloss.Center,
+						chartTextStyle.Render(lipgloss.PlaceVertical(0, lipgloss.Top, "100%")),
+						chartTextStyle.Render(lipgloss.PlaceVertical(10, lipgloss.Bottom, "0%")),
+					),
+					chartStyle.Render(m.cpuChart.View()),
+				),
+				gaugeStyle.Render(m.cpuProgress.ViewAs(math.Min(m.cpuTotalPercent/100.0, 1.0))),
+				tabGap.Render(strings.Repeat(" ", max(0, m.width))),
+				lipgloss.JoinHorizontal(
+					lipgloss.Left,
+					lipgloss.JoinVertical(
+						lipgloss.Top,
+						listTitleStyle.Render("CPU Info"),
+						listTextStyle.Render(fmt.Sprintf("CPU: %2.f%%\n\nSpeed: %.1f Mhz\n\nCores: %d\n\n%s\n\n",
+							m.cpuTotalPercent, m.cpuInfo.Mhz, m.cpuInfo.Cores, m.cpuInfo.ModelName)),
+					),
+					bottomColStyle.Render(m.cpuTable.View()),
+				),
 			),
-			baseStyle.Render(m.cpuTable.View()),
-		),
 		)
-
-		// return pageContentStyle.Render(lipgloss.JoinVertical(
-		// 	lipgloss.Left,
-		// 	gauge.Render(fmt.Sprintf(
-		// 		"CPU: %.2f%%\n%s\n",
-		// 		m.cpuTotalPercent,
-		// 		loadGauge(m.cpuTotalPercent, 45))),
-		// 	baseStyle.Render(m.cpuTable.View()),
-		// ))
-		// return lipgloss.JoinVertical(
-		// 	lipgloss.Left,
-		// 	gauge.Render(fmt.Sprintf(
-		// 		"CPU: %.2f%%\n%s\n",
-		// 		m.cpuTotalPercent,
-		// 		loadGauge(m.cpuTotalPercent, 45))),
-		// 	baseStyle.Render(m.cpuTable.View()),
-		// )
 	// Ram stats
 	case activeTab == 1:
-		return pageContentStyle.Render(lipgloss.JoinVertical(
-			lipgloss.Left,
-			gauge.Render(fmt.Sprintf(
-				"RAM: %.2f%%\n%s\n",
-				m.memory.UsedPercent,
-				loadGauge(m.memory.UsedPercent, 45))),
-			baseStyle.Render(m.memTable.View()),
-		))
-		// return lipgloss.JoinVertical(
-		// 	lipgloss.Left,
-		// 	gauge.Render(fmt.Sprintf(
-		// 		"RAM: %.2f%%\n%s\n",
-		// 		m.memory.UsedPercent,
-		// 		loadGauge(m.memory.UsedPercent, 45))),
-		// 	baseStyle.Render(m.memTable.View()),
-		// )
+		return pageContentStyle.Render(
+			lipgloss.JoinVertical(
+				lipgloss.Left,
+				lipgloss.JoinHorizontal(
+					lipgloss.Left,
+					lipgloss.JoinVertical(
+						lipgloss.Center,
+						chartTextStyle.Render(lipgloss.PlaceVertical(0, lipgloss.Top, "100%")),
+						chartTextStyle.Render(lipgloss.PlaceVertical(10, lipgloss.Bottom, "0%")),
+					),
+					chartStyle.Render(m.memChart.View()),
+				),
+				gaugeStyle.Render(m.memProgress.ViewAs(math.Min(m.memory.UsedPercent/100.0, 1.0))),
+				tabGap.Render(strings.Repeat(" ", max(0, m.width))),
+				lipgloss.JoinHorizontal(
+					lipgloss.Left,
+					lipgloss.JoinVertical(
+						lipgloss.Top,
+						listTitleStyle.Render("Memory Info"),
+						listTextStyle.Render(fmt.Sprintf("Used RAM: %.2f%%\n", m.memory.UsedPercent)),
+					),
+					bottomColStyle.Render(m.memTable.View()),
+				),
+			))
 	// Running processes
 	case activeTab == 2:
 		return pageContentStyle.Render(lipgloss.JoinVertical(
 			lipgloss.Left,
 			titleStyle.Render("TOP RUNNING PROCESSES"),
-			baseStyle.Render(m.procTable.View()),
+			bottomColStyle.Render(m.procTable.View()),
 		))
-		// return lipgloss.JoinVertical(
-		// 	lipgloss.Left,
-		// 	titleStyle.Render("TOP RUNNING PROCESSES"),
-		// 	baseStyle.Render(m.procTable.View()),
-		// )
 	// Disk availability
 	case activeTab == 3:
 		return pageContentStyle.Render(lipgloss.JoinVertical(
 			lipgloss.Left,
 			titleStyle.Render("AVAILABLE DISK PARTITIONS"),
-			baseStyle.Render(m.diskTable.View()),
+			bottomColStyle.Render(m.diskTable.View()),
 		))
-		// return lipgloss.JoinVertical(
-		// 	lipgloss.Left,
-		// 	titleStyle.Render("AVAILABLE DISK PARTITIONS"),
-		// 	baseStyle.Render(m.diskTable.View()),
-		// )
 	default:
 		return fmt.Sprint(m.tabs)
 	}
